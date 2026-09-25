@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>あなたの声診断 | かしまだちほ（Ph.D）監修</title>
+<style>
+  :root{
+    --bg1:#fff6f0; --bg2:#ffeef5;
+    --card:#ffffff; --card2:#fff3f6;
+    --accent:#ff8da1; --accent2:#57cdc3;
+    --text:#2c2a38; --sub:#5f5b70; --good:#1f9e82; --bad:#e0455f;
+    --line:#f1e5ea; --gold:#dd9a2e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Hiragino Maru Gothic ProN","Yu Gothic","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    background:linear-gradient(165deg,var(--bg1),var(--bg2)) fixed;
+    color:var(--text); line-height:1.8; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:28px 18px 90px;}
+
+  /* ---- ヒーロー(監修者・タイトル) ---- */
+  .hero{text-align:center; margin-bottom:10px;}
+  .avatar-ring{
+    width:130px; height:130px; margin:0 auto 14px; border-radius:50%;
+    padding:4px; background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 10px 26px rgba(255,141,161,.35);
+  }
+  .avatar-ring img, .avatar-fallback{
+    width:100%; height:100%; border-radius:50%; object-fit:cover; display:block;
+    background:var(--card2); border:3px solid #fff;
+  }
+  .avatar-fallback{display:none; align-items:center; justify-content:center;
+    font-size:42px; color:var(--sub);}
+  .supervisor{font-size:16px; color:#3a3846; letter-spacing:.02em; margin-bottom:6px; font-weight:600;}
+  .supervisor b{font-size:21px; color:#2c2a38; font-weight:800;}
+  .phd{display:inline-block; font-size:11px; background:var(--gold); color:#fff;
+    border-radius:99px; padding:1px 9px; margin-left:5px; vertical-align:middle; font-weight:700;}
+  h1{font-size:32px; margin:6px 0 6px; letter-spacing:.04em; font-weight:800;
+    background:linear-gradient(90deg,#ff7e95,#3bbf9f);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+  .badge{font-size:11px; background:#fff; color:var(--accent2);
+    border:1px solid var(--accent2); border-radius:99px; padding:3px 10px; font-weight:700;}
+  .lead{color:var(--sub); font-size:14px; margin:10px 6px 20px;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line); border-radius:24px; padding:22px; margin:16px 0;
+    box-shadow:0 10px 26px rgba(255,150,170,.12);
+  }
+  .step-no{
+    display:inline-block; background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff; font-weight:800; border-radius:999px; width:28px; height:28px;
+    text-align:center; line-height:28px; font-size:15px; margin-right:9px;
+  }
+  .step-ttl{font-size:17px; font-weight:800;}
+  .passage{
+    background:var(--card2); border-radius:16px; padding:18px; font-size:19px;
+    line-height:2.0; margin:14px 0; border:2px dashed #ffd3dd; color:#3a3846;
+  }
+  .passage b{color:var(--accent); font-weight:800;}
+  .hint{font-size:13px; color:var(--sub); margin:6px 0 0;}
+  button{
+    font-family:inherit; cursor:pointer; border:none; border-radius:16px;
+    font-size:16px; font-weight:800; padding:15px 18px; transition:.15s;
+  }
+  button:active{transform:translateY(1px);}
+  .btn-rec{background:linear-gradient(135deg,var(--accent),#ff9fb0); color:#fff; width:100%;
+    box-shadow:0 6px 16px rgba(255,141,161,.4);}
+  .btn-rec.recording{background:var(--bad); animation:pulse 1s infinite;}
+  .btn-rec:disabled{opacity:.45; cursor:not-allowed; box-shadow:none;}
+  @keyframes pulse{50%{opacity:.6;}}
+  .btn-ghost{background:#fff; color:var(--accent2); border:2px solid var(--accent2);}
+  .btn-cta{
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff;
+    width:100%; font-size:18px; padding:17px; box-shadow:0 8px 20px rgba(87,205,195,.35);
+  }
+  .status{font-size:14px; margin-top:12px; color:var(--sub); min-height:20px;}
+  .status.done{color:var(--good); font-weight:700;}
+  .status.err{color:var(--bad); font-weight:700;}
+  .timer{font-size:38px; font-weight:800; text-align:center; margin:8px 0; color:var(--accent);
+    letter-spacing:.05em;}
+
+  /* ---- 方言セレクタ ---- */
+  .dialect-label{font-size:14px; color:var(--text); font-weight:700; display:block; margin-bottom:10px;}
+  .seg{display:flex; gap:8px; flex-wrap:wrap;}
+  .seg button{
+    flex:1; min-width:64px; background:var(--card2); color:var(--sub);
+    border:2px solid var(--line); font-size:14px; padding:11px 8px; border-radius:14px;
+  }
+  .seg button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff; border-color:transparent;}
+
+  #results{display:none;}
+  .score-big{text-align:center; margin:6px 0 4px;}
+  .score-big .num{font-size:70px; font-weight:800; line-height:1;
+    background:linear-gradient(90deg,#ff7e95,#3bbf9f);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+  .score-big .label{color:var(--sub); font-size:14px;}
+  canvas#radar{display:block; margin:10px auto; max-width:100%;}
+  .axis-list{margin:8px 0 0; padding:0; list-style:none;}
+  .axis-item{padding:14px 0; border-top:1px solid var(--line);}
+  .axis-head{display:flex; justify-content:space-between; align-items:center;}
+  .axis-name{font-weight:800;}
+  .axis-score{font-weight:800; font-size:19px; color:var(--accent);}
+  .bar{height:10px; border-radius:99px; background:var(--card2); margin:9px 0 7px; overflow:hidden;}
+  .bar > i{display:block; height:100%; border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));}
+  .axis-tip{font-size:14px; color:#3a3846; line-height:1.7;}
+  .detail{font-size:12px; color:var(--sub); margin-top:16px;
+    background:var(--card2); border-radius:14px; padding:14px;}
+  .detail table{width:100%; border-collapse:collapse;}
+  .detail td{padding:4px 0;} .detail td:last-child{text-align:right; color:var(--text); font-weight:700;}
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  .note{font-size:12px; color:var(--sub); margin-top:18px; text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ヒーロー -->
+  <div class="hero">
+    <div class="avatar-ring">
+      <img id="avatar" src="profile.jpg?v=2" alt="鹿島田千帆"
+           onerror="this.style.display='none';document.getElementById('avatarFallback').style.display='flex';">
+      <div class="avatar-fallback" id="avatarFallback">🎤</div>
+    </div>
+    <div class="supervisor">アナウンサー・音声研究者 <b>かしまだちほ</b><span class="phd">Ph.D</span> 監修</div>
+    <h1>あなたの声診断</h1>
+    <span class="badge">🔬 Praat解析版</span>
+    <p class="lead">2つの録音をするだけ♪ 音声学の研究ツール Praat が、<br>あなたの声を6つの観点でやさしく分析します。</p>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="card" id="card1">
+    <div><span class="step-no">1</span><span class="step-ttl">「あー」を5秒のばす</span></div>
+    <p class="hint">声の安定感・クリアさを測ります。マイクから20cmほど離れ、ラクな高さで「あ〜」と一定にのばしてください。</p>
+    <div class="timer" id="timer1">5.0</div>
+    <button class="btn-rec" id="rec1">🎙 録音する(5秒)</button>
+    <div class="status" id="status1"></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card" id="card2">
+    <div><span class="step-no">2</span><span class="step-ttl">文章を読む</span></div>
+    <p class="hint">声の高さ・音域・響き・口の開き・声量を測ります。下の文を、ふだんの話し方で読んでください。</p>
+    <div class="passage">
+      あおい そらに、まるい くもが ひとつ うかんでいます。<br>
+      かぜが ゆれると、なみは ゆっくり ひろがり、ひかりが まぶしく かがやきます。<br>
+      <b>ああ、なんて きもちの いい あさでしょう。</b>
+    </div>
+    <button class="btn-rec" id="rec2">🎙 録音する(読み終えたら停止)</button>
+    <div class="status" id="status2"></div>
+  </div>
+
+  <!-- ANALYZE -->
+  <div class="card">
+    <button class="btn-cta" id="analyze" disabled>✨ 結果を見る</button>
+    <div class="status" id="statusA"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="card" id="results">
+    <div class="score-big">
+      <div class="num" id="totalScore">--</div>
+      <div class="label">あなたの声 総合スコア(100点満点)</div>
+    </div>
+    <p style="text-align:center;font-weight:800;margin:4px 0 16px;font-size:16px" id="totalComment"></p>
+
+    <!-- 方言セレクタ -->
+    <span class="dialect-label">💬 アドバイスの言葉づかいを選べます</span>
+    <div class="seg" id="dialectSeg">
+      <button data-d="標準" class="on">標準</button>
+      <button data-d="関西弁">関西弁</button>
+      <button data-d="栃木弁">栃木弁</button>
+      <button data-d="東北弁">東北弁</button>
+    </div>
+
+    <canvas id="radar" width="360" height="340"></canvas>
+    <ul class="axis-list" id="axisList"></ul>
+
+    <div class="detail">
+      <div style="font-weight:800;margin-bottom:6px;color:var(--text)">📊 Praat 解析データ(詳細)</div>
+      <table id="detailTable"></table>
+    </div>
+
+    <div class="row" style="margin-top:18px;">
+      <button class="btn-ghost" id="share">📲 結果をシェア</button>
+      <button class="btn-ghost" id="saveImg">🖼 画像で保存</button>
+    </div>
+    <button class="btn-cta" id="cta" style="margin-top:12px;">🎯 無料体験レッスンに申し込む</button>
+    <p class="note">※ Praat(音声学の研究ツール)による解析です。点数の基準値は指導方針に合わせて調整できます。</p>
+  </div>
+
+  <p class="note">© かしまだちほ 監修 あなたの声診断</p>
+</div>
+
+<script>
+/* =========================================================================
+   あなたの声診断(Praat解析版)
+   録音 → Float32 PCM を Python(Parselmouth=Praat)サーバーへ送信 → 結果表示
+   ========================================================================= */
+
+const CTA_URL = "#"; // ←ここに体験予約ページのURLを入れてください
+let rec1Data=null, rec2Data=null;
+let DIALECT="標準";
+let lastAxes=null, lastTotal=null;
+
+const AXES = ["高さ・音域","声の安定性","響き・明るさ","口の開き","声量","クリアさ"];
+
+/* ---- アドバイス文(方言別 / 各3段階[低・中・高]) ---- */
+const TIPS = {
+  "標準":{
+    "高さ・音域":["声の高低の幅が狭めです。文末を少し上げ下げする練習で表現力が伸びます。","標準的な音域です。高い声・低い声を意識すると、もっと豊かになります。","音域が広く、表現力のある声です。とても良いです!"],
+    "声の安定性":["声が少し揺れています。お腹で支え、息を一定に流す練習がおすすめです。","まずまず安定しています。ロングトーン練習でさらに安定します。","とても安定した、ブレない声です!"],
+    "響き・明るさ":["こもりがちな響きです。口を縦に開け、前に当てる意識で明るくなります。","標準的な響きです。共鳴を意識すると通る声に近づきます。","明るく前に通る、よく響く声です!"],
+    "口の開き":["口の開きが小さめです。指が縦に2本入るくらい大きく開く練習を。","標準的な開き方です。母音をはっきり開くともっと明瞭になります。","しっかり口が開けていて、明瞭な発音です!"],
+    "声量":["声量が控えめです。腹式呼吸で息の量を増やすと安定して大きくなります。","適度な声量です。場面に応じた強弱をつけられると◎。","しっかりした、よく通る声量です!"],
+    "クリアさ":["息漏れ・かすれがやや目立ちます。声帯をしっかり閉じる練習が効果的です。","クリアさは標準的です。発声を整えるとさらにクリアになります。","雑味のない、とてもクリアな声です!"],
+    "total":["今が伸びどき。トレーニングで大きく変われます。","良いベースがあります。伸びしろもたっぷり!","すばらしい声です!さらに磨けば武器になります。"]
+  },
+  "関西弁":{
+    "高さ・音域":["声の高さの幅がちょっと狭いなぁ。文の終わりを上げ下げしたら、グッと表現力が出てくるで。","音域はまずまずやね。高い声も低い声も意識したら、もっと豊かになるで〜。","音域めっちゃ広いやん!表現力たっぷりのええ声やで!"],
+    "声の安定性":["声がちょっと揺れてるなぁ。お腹で支えて、息を一定に流す練習してみ。","まあまあ安定してるで。ロングトーンの練習でもっと安定するわ。","めっちゃ安定しとる、ブレへんええ声や!"],
+    "響き・明るさ":["ちょっとこもってるなぁ。口を縦に開けて前に当てる意識したら明るなるで。","響きはふつうやね。共鳴を意識したら、もっと通る声になるで。","明るう前に通る、よう響くええ声やん!"],
+    "口の開き":["口の開きがちょっと小さいわ。指が縦に2本入るくらいガバッと開けてみ。","開き方はまあまあやね。母音をはっきり開けたら、もっとくっきりするで。","しっかり口開いてて、はっきりした発音やん!"],
+    "声量":["声がちょっと控えめやなぁ。腹式呼吸で息の量増やしたら、安定して大きなるで。","声量はちょうどええ感じや。強弱つけられたら最高やで。","しっかりした、よう通る声量やん!ええで!"],
+    "クリアさ":["ちょっと息漏れ・かすれが目立つなぁ。声帯しっかり閉じる練習が効くで。","クリアさはふつうやね。発声整えたら、もっとスッキリするで。","雑味のない、めっちゃクリアな声や!"],
+    "total":["今が伸びどきや!トレーニングでガラッと変われるで!","ええ土台あるで〜。伸びしろもたっぷりや!","めっちゃええ声やん!磨いたら最強の武器になるで!"]
+  },
+  "栃木弁":{
+    "高さ・音域":["声の高さの幅がちっと狭いなぁ。文の終わりを上げ下げすっと、表現力が出てくっぺよ。","音域はまあまあだっぺ。高え声も低え声も意識すっと、もっと豊かになっぺ。","音域広いなぁ!表現力たっぷりのいい声だっぺ!"],
+    "声の安定性":["声がちっと揺れてっぺ。お腹で支えて、息を一定に流す練習してみっせ。","まあまあ安定してっぺ。ロングトーンの練習でもっと安定すっぺよ。","ずいぶん安定してて、ブレねぇいい声だっぺ!"],
+    "響き・明るさ":["ちっとこもってっぺなぁ。口を縦に開けて前さ当てる意識すっと明るくなっぺ。","響きはふつうだっぺ。共鳴を意識すっと、もっと通る声になっぺ。","明るく前さ通る、よく響くいい声だっぺ!"],
+    "口の開き":["口の開きがちっと小せぇなぁ。指が縦に2本入るくれぇ大きく開けてみっせ。","開き方はまあまあだっぺ。母音をはっきり開くと、もっとはっきりすっぺ。","しっかり口開いてて、はっきりした発音だっぺ!"],
+    "声量":["声がちっと控えめだなぁ。腹式呼吸で息の量増やすと、安定して大きくなっぺ。","声量はちょうどいいくれぇだっぺ。強弱つけられっといいなぁ。","しっかりした、よく通る声量だっぺ!いいなぁ!"],
+    "クリアさ":["ちっと息漏れ・かすれが目立つなぁ。声帯しっかり閉じる練習が効くっぺ。","クリアさはふつうだっぺ。発声整えっと、もっとスッキリすっぺ。","雑味のねぇ、すごくクリアな声だっぺ!"],
+    "total":["今が伸びどきだっぺ!トレーニングで大きく変われっぺ!","いい土台があっぺ。伸びしろもたっぷりだっぺ!","すばらしい声だっぺ!磨けば立派な武器になっぺ!"]
+  },
+  "東北弁":{
+    "高さ・音域":["声の高さの幅がちょっこら狭えなぁ。文の終わりば上げ下げすっと、表現力が出てくるべ。","音域はまずまずだべ。高え声も低え声も意識すっと、もっと豊かになるべさ。","音域広えなぁ!表現力たっぷりのいい声だべ!"],
+    "声の安定性":["声がちょっこら揺れでるべ。お腹で支えで、息ば一定に流す練習してみへ。","まずまず安定してるべ。ロングトーンの練習でもっと安定するべさ。","ずいぶん安定してで、ブレねえいい声だべ!"],
+    "響き・明るさ":["ちょっこらこもってるなぁ。口ば縦に開げで前さ当てる意識すっと明るくなるべ。","響きはふつうだべ。共鳴ば意識すっと、もっと通る声になるべ。","明るぐ前さ通る、よぐ響くいい声だべ!"],
+    "口の開き":["口の開きがちょっこら小せえなぁ。指が縦に2本入るくれえ大ぎぐ開げでみへ。","開き方はまずまずだべ。母音ばはっきり開ぐと、もっとはっきりするべ。","しっかり口開いでで、はっきりした発音だべ!"],
+    "声量":["声がちょっこら控えめだなぁ。腹式呼吸で息の量増やすと、安定して大ぎぐなるべ。","声量はちょうどいいくれえだべ。強弱つけられっといいなぁ。","しっかりした、よぐ通る声量だべ!いいなぁ!"],
+    "クリアさ":["ちょっこら息漏れ・かすれが目立づなぁ。声帯ばしっかり閉じる練習が効ぐべ。","クリアさはふつうだべ。発声ば整えっと、もっとスッキリするべ。","雑味のねえ、すごぐクリアな声だべ!"],
+    "total":["今が伸びどきだべ!トレーニングで大ぎぐ変われるべ!","いい土台があるべ。伸びしろもたっぷりだべ!","たいしたいい声だべ!磨げば立派な武器になるべ!"]
+  }
+};
+
+// ---------- 録音 ----------
+function setupRecorder(btnId, statusId, opts){
+  const btn=document.getElementById(btnId);
+  const status=document.getElementById(statusId);
+  let mediaRecorder=null, chunks=[], stream=null, timerInt=null;
+
+  btn.addEventListener('click', async ()=>{
+    if(mediaRecorder && mediaRecorder.state==='recording'){ mediaRecorder.stop(); return; }
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({audio:{
+        echoCancellation:false, noiseSuppression:false, autoGainControl:false
+      }});
+    }catch(e){
+      status.textContent="⚠ マイクを使えませんでした。マイクの許可を確認してください。";
+      status.className="status err"; return;
+    }
+    chunks=[];
+    mediaRecorder=new MediaRecorder(stream);
+    mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
+    mediaRecorder.onstop=async ()=>{
+      clearInterval(timerInt);
+      stream.getTracks().forEach(t=>t.stop());
+      btn.classList.remove('recording');
+      btn.textContent= opts.fixed? "🎙 もう一度録音(5秒)" : "🎙 もう一度録音";
+      status.textContent="Praatで解析中…"; status.className="status";
+      // 反応が遅いときは「起動中」と案内する(無料プランは初回に時間がかかるため)
+      const slowTimer=setTimeout(()=>{
+        status.textContent="サーバーを起動しています…(初回は1分ほどかかることがあります)";
+        status.className="status";
+      }, 3000);
+      try{
+        const blob=new Blob(chunks);
+        const buf=await blob.arrayBuffer();
+        const ac=new (window.AudioContext||window.webkitAudioContext)();
+        const audio=await ac.decodeAudioData(buf);
+        const pcm=audio.getChannelData(0);
+        const res=await analyzeServer(pcm, audio.sampleRate);
+        clearTimeout(slowTimer);
+        opts.store(res);
+        if(res && res.valid){
+          status.textContent="✓ 解析できました"; status.className="status done";
+        }else{
+          status.textContent="⚠ 声をうまく検出できませんでした。もう一度お試しください。";
+          status.className="status err";
+        }
+        checkReady();
+      }catch(e){
+        clearTimeout(slowTimer);
+        status.textContent="⚠ 解析サーバーに接続できませんでした。通信環境を確認して、もう一度お試しください。";
+        status.className="status err";
+      }
+    };
+    mediaRecorder.start();
+    btn.classList.add('recording');
+    btn.textContent="■ 停止";
+    status.textContent="録音中…"; status.className="status";
+
+    if(opts.fixed){
+      let remain=5.0;
+      const tEl=document.getElementById(opts.timerId);
+      timerInt=setInterval(()=>{
+        remain-=0.1;
+        if(remain<=0){ remain=0; tEl.textContent="0.0";
+          if(mediaRecorder.state==='recording') mediaRecorder.stop();
+          clearInterval(timerInt);
+        } else { tEl.textContent=remain.toFixed(1); }
+      },100);
+    }
+  });
+}
+
+const TARGET_SR = 16000;
+
+// 録音(通常48kHz)を16kHzに変換。ブラウザの高音質リサンプラを使う
+async function resampleTo16k(pcm, srIn){
+  if(Math.round(srIn)===TARGET_SR) return pcm;
+  try{
+    const len=Math.ceil(pcm.length*TARGET_SR/srIn);
+    const off=new OfflineAudioContext(1, len, TARGET_SR);
+    const buf=off.createBuffer(1, pcm.length, srIn);
+    buf.copyToChannel(pcm, 0);
+    const src=off.createBufferSource();
+    src.buffer=buf; src.connect(off.destination); src.start();
+    const rendered=await off.startRendering();
+    return rendered.getChannelData(0);
+  }catch(e){
+    // 対応していないブラウザ向けの簡易版(平均をとって折り返し雑音を抑える)
+    const ratio=srIn/TARGET_SR, n=Math.floor(pcm.length/ratio);
+    const out=new Float32Array(n), w=Math.max(1,Math.round(ratio));
+    for(let i=0;i<n;i++){
+      const st=Math.floor(i*ratio); let sum=0,c=0;
+      for(let k=0;k<w && st+k<pcm.length;k++){ sum+=pcm[st+k]; c++; }
+      out[i]=c?sum/c:0;
+    }
+    return out;
+  }
+}
+
+// 32bit→16bitに変換(データ量をさらに半分に)
+function toInt16(f32){
+  const out=new Int16Array(f32.length);
+  for(let i=0;i<f32.length;i++){
+    const s=Math.max(-1, Math.min(1, f32[i]));
+    out[i]= s<0 ? s*0x8000 : s*0x7FFF;
+  }
+  return out;
+}
+
+// 16kHz/16bit に圧縮して送信(通信量は約1/6。解析精度は変わりません)
+async function analyzeServer(pcm, sr){
+  const small=toInt16(await resampleTo16k(pcm, sr));
+  const res=await fetch(`/analyze?sr=${TARGET_SR}&fmt=i16`,{
+    method:'POST',
+    headers:{'Content-Type':'application/octet-stream'},
+    body: small.buffer
+  });
+  return await res.json();
+}
+
+setupRecorder('rec1','status1',{fixed:true, timerId:'timer1', store:r=>{ rec1Data=r; }});
+setupRecorder('rec2','status2',{fixed:false, store:r=>{ rec2Data=r; }});
+
+function checkReady(){
+  document.getElementById('analyze').disabled =
+    !((rec1Data&&rec1Data.valid) || (rec2Data&&rec2Data.valid));
+}
+
+function avg(a){ return a.reduce((s,v)=>s+v,0)/(a.length||1); }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+function num(v,d){ return (v===null||v===undefined||Number.isNaN(v))? d : v; }
+function band(s){ return s>=75?2 : s>=50?1 : 0; }
+function totalBand(s){ return s>=75?2 : s>=55?1 : 0; }
+
+// ---------- スコア化(基準値は指導方針に合わせ調整可) ----------
+function scoreFrom(rA, rB){
+  const stab = (rA && rA.valid) ? rA : (rB||{});
+  const read = (rB && rB.valid) ? rB : (rA||{});
+
+  const rangeSt = num(read.range_st, 4);
+  const sHeight = clamp(Math.round(rangeSt/12*100), 5, 100);
+
+  const jit = num(stab.jitter, 1.5), shim = num(stab.shimmer, 6);
+  const sJit = clamp(100-(jit-0.4)*45, 5, 100);
+  const sShim = clamp(100-(shim-2.0)*13, 5, 100);
+  const sStable = Math.round((sJit+sShim)/2);
+
+  const f2 = num(read.f2, 1500);
+  const sBright = clamp(Math.round((f2-1200)/1100*100), 5, 100);
+
+  const f1 = num(read.f1, 450);
+  const sOpen = clamp(Math.round((f1-350)/350*100), 5, 100);
+
+  const db = num(read.intensity_db, 62);
+  const sVolume = clamp(Math.round((db-52)/28*100), 5, 100);
+
+  const hnr = num(stab.hnr, 12);
+  const sClear = clamp(Math.round((hnr-5)/18*100), 5, 100);
+
+  return [
+    {key:"高さ・音域", score:sHeight},
+    {key:"声の安定性", score:sStable},
+    {key:"響き・明るさ", score:sBright},
+    {key:"口の開き",   score:sOpen},
+    {key:"声量",       score:sVolume},
+    {key:"クリアさ",   score:sClear},
+  ];
+}
+
+// ---------- 表示 ----------
+document.getElementById('analyze').addEventListener('click', ()=>{
+  const statusA=document.getElementById('statusA');
+  if(!(rec1Data&&rec1Data.valid) && !(rec2Data&&rec2Data.valid)){
+    statusA.textContent="⚠ 声をうまく検出できませんでした。静かな場所でもう一度お試しください。";
+    statusA.className="status err"; return;
+  }
+  statusA.textContent="";
+  lastAxes=scoreFrom(rec1Data, rec2Data);
+  lastTotal=Math.round(avg(lastAxes.map(a=>a.score)));
+  renderResults();
+  drawRadar(lastAxes);
+  showDetail(rec1Data, rec2Data);
+  document.getElementById('results').style.display="block";
+  document.getElementById('results').scrollIntoView({behavior:'smooth'});
+});
+
+function renderResults(){
+  if(!lastAxes) return;
+  document.getElementById('totalScore').textContent=lastTotal;
+  document.getElementById('totalComment').textContent=TIPS[DIALECT].total[totalBand(lastTotal)];
+  const ul=document.getElementById('axisList'); ul.innerHTML="";
+  lastAxes.forEach(a=>{
+    const tip=TIPS[DIALECT][a.key][band(a.score)];
+    const li=document.createElement('li'); li.className="axis-item";
+    li.innerHTML=`<div class="axis-head"><span class="axis-name">${a.key}</span>
+      <span class="axis-score">${a.score}</span></div>
+      <div class="bar"><i style="width:${a.score}%"></i></div>
+      <div class="axis-tip">${tip}</div>`;
+    ul.appendChild(li);
+  });
+}
+
+// 方言切り替え
+document.getElementById('dialectSeg').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  DIALECT=b.dataset.d;
+  [...document.querySelectorAll('#dialectSeg button')].forEach(x=>x.classList.toggle('on', x===b));
+  renderResults();
+});
+
+function drawRadar(axes){
+  const cv=document.getElementById('radar'), ctx=cv.getContext('2d');
+  const W=cv.width, H=cv.height, cx=W/2, cy=H/2+8, R=108;
+  ctx.clearRect(0,0,W,H);
+  const N=axes.length;
+  const ang=i=>-Math.PI/2 + i*2*Math.PI/N;
+  for(let g=1;g<=4;g++){
+    ctx.beginPath();
+    for(let i=0;i<=N;i++){
+      const r=R*g/4, a=ang(i%N);
+      const px=cx+r*Math.cos(a), py=cy+r*Math.sin(a);
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.strokeStyle="rgba(120,110,130,.16)"; ctx.stroke();
+  }
+  ctx.fillStyle="#7a7790"; ctx.font="13px sans-serif";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  axes.forEach((a,i)=>{
+    const aa=ang(i), lx=cx+(R+28)*Math.cos(aa), ly=cy+(R+20)*Math.sin(aa);
+    ctx.fillText(a.key, lx, ly);
+  });
+  ctx.beginPath();
+  axes.forEach((a,i)=>{
+    const r=R*a.score/100, aa=ang(i);
+    const px=cx+r*Math.cos(aa), py=cy+r*Math.sin(aa);
+    i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  });
+  ctx.closePath();
+  const grad=ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,"rgba(255,141,161,.45)");
+  grad.addColorStop(1,"rgba(87,205,195,.45)");
+  ctx.fillStyle=grad; ctx.fill();
+  ctx.strokeStyle="#ff8da1"; ctx.lineWidth=2.5; ctx.stroke();
+  axes.forEach((a,i)=>{
+    const r=R*a.score/100, aa=ang(i);
+    ctx.beginPath(); ctx.arc(cx+r*Math.cos(aa), cy+r*Math.sin(aa),3.5,0,7);
+    ctx.fillStyle="#57cdc3"; ctx.fill();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke();
+  });
+}
+
+function showDetail(rA,rB){
+  const rows=[];
+  const r=(rB&&rB.valid)?rB:rA;
+  const s=(rA&&rA.valid)?rA:rB;
+  const fix=(v,u,d=0)=> (v===null||v===undefined)? "—" : v.toFixed(d)+u;
+  if(r&&r.valid){
+    rows.push(["平均の高さ(F0)", fix(r.f0_med," Hz")]);
+    rows.push(["音域(下〜上)", `${Math.round(r.f0_low)}〜${Math.round(r.f0_high)} Hz (${r.range_st.toFixed(1)}半音)`]);
+    rows.push(["F1(口の開き)", fix(r.f1," Hz")]);
+    rows.push(["F2(響き・明るさ)", fix(r.f2," Hz")]);
+    rows.push(["F3", fix(r.f3," Hz")]);
+    rows.push(["声量", fix(r.intensity_db," dB",1)]);
+  }
+  if(s&&s.valid){
+    rows.push(["ジッター(声の揺れ)", fix(s.jitter," %",2)]);
+    rows.push(["シマー(振幅の揺れ)", fix(s.shimmer," %",2)]);
+    rows.push(["HNR(クリアさ)", fix(s.hnr," dB",1)]);
+  }
+  document.getElementById('detailTable').innerHTML=
+    rows.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td></tr>`).join("");
+}
+
+// ---------- シェア・保存・CTA ----------
+document.getElementById('share').addEventListener('click', async ()=>{
+  const total=document.getElementById('totalScore').textContent;
+  const text=`私の声 総合スコアは ${total}点 でした!🎤 #あなたの声診断`;
+  if(navigator.share){ try{ await navigator.share({title:"あなたの声診断",text}); }catch(e){} }
+  else { try{ await navigator.clipboard.writeText(text); alert("結果をコピーしました!SNSに貼り付けてください。"); }catch(e){ alert(text); } }
+});
+document.getElementById('saveImg').addEventListener('click', ()=>{
+  const cv=document.getElementById('radar');
+  const a=document.createElement('a');
+  a.download="voice-result.png"; a.href=cv.toDataURL("image/png"); a.click();
+});
+document.getElementById('cta').addEventListener('click', ()=>{
+  if(CTA_URL && CTA_URL!=="#") location.href=CTA_URL;
+  else alert("ここに体験レッスンの予約ページを設定できます(CTA_URL を編集)。");
+});
+</script>
+</body>
+</html>

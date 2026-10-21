@@ -6,14 +6,20 @@
 ローカル起動: python app.py  → http://localhost:5000
 本番(Render): gunicorn app:app
 """
+import io
+import json
+import math
 import os
 import sys
+import urllib.request
+from datetime import datetime, timezone, timedelta
 
 import numpy as np
 import parselmouth
 from parselmouth.praat import call
-from flask import Flask, request, jsonify, send_from_directory, abort
+from flask import Flask, request, jsonify, send_from_directory, abort, Response, render_template_string
 from flask_cors import CORS
+from PIL import Image, ImageDraw, ImageFont
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
@@ -29,6 +35,18 @@ else:
 
 # 公開してよいファイルだけを配信する(app.py 等のソースを配らないため)
 PUBLIC_FILES = {"index.html", "profile.jpg"}
+
+AXIS_NAMES = ["高さ・音域", "声の安定性", "響き・明るさ", "口の開き", "声量", "クリアさ"]
+FONT_DIR = os.path.join(BASE_DIR, "fonts")
+JST = timezone(timedelta(hours=9))
+
+# 結果をスプレッドシートへ送る先(Renderの環境変数で設定。未設定なら記録しない)
+SHEET_WEBHOOK_URL = os.environ.get("SHEET_WEBHOOK_URL", "").strip()
+
+
+def _font(bold, size):
+    name = "NotoSansJP-Bold.otf" if bold else "NotoSansJP-Regular.otf"
+    return ImageFont.truetype(os.path.join(FONT_DIR, name), size)
 
 
 def safe(fn, default=None):
@@ -137,6 +155,188 @@ def analyze():
     except Exception:
         return jsonify({"valid": False, "error": "analysis failed"})
     return jsonify(res)
+
+
+# =========================================================================
+#  シェア用の結果画像 & 結果ページ
+#  SNSに貼ったリンクから、レーダーチャート入りの画像が表示されるようにする
+# =========================================================================
+
+def _parse_result_params(args):
+    """URLのパラメータから、名前・総合点・6項目の点数を安全に取り出す"""
+    name = (args.get("n", "") or "")[:12]
+    try:
+        total = max(0, min(100, int(args.get("t", 0))))
+    except ValueError:
+        total = 0
+    scores = []
+    for part in (args.get("a", "") or "").split(",")[:6]:
+        try:
+            scores.append(max(0, min(100, int(part))))
+        except ValueError:
+            scores.append(0)
+    while len(scores) < 6:
+        scores.append(0)
+    return name, total, scores
+
+
+def _draw_radar(d, scores, cx, cy, R, font):
+    n = len(scores)
+    ang = lambda i: -math.pi / 2 + i * 2 * math.pi / n
+
+    for g in range(1, 5):
+        r = R * g / 4
+        d.polygon([(cx + r * math.cos(ang(i)), cy + r * math.sin(ang(i))) for i in range(n)],
+                  outline=(190, 182, 196))
+
+    pts = [(cx + R * scores[i] / 100 * math.cos(ang(i)),
+            cy + R * scores[i] / 100 * math.sin(ang(i))) for i in range(n)]
+    d.polygon(pts, fill=(255, 176, 190), outline=(255, 141, 161))
+    d.line(pts + [pts[0]], fill=(255, 141, 161), width=4)
+    for px, py in pts:
+        d.ellipse([px - 6, py - 6, px + 6, py + 6], fill=(87, 205, 195), outline=(255, 255, 255), width=3)
+
+    for i, label in enumerate(AXIS_NAMES[:n]):
+        a = ang(i)
+        lx, ly = cx + (R + 56) * math.cos(a), cy + (R + 36) * math.sin(a)
+        w = d.textlength(label, font=font)
+        d.text((lx - w / 2, ly - 16), label, font=font, fill=(122, 119, 144))
+
+
+def _render_card(name, total, scores):
+    """1080x1080 の結果画像を作る"""
+    W = H = 1080
+    img = Image.new("RGB", (W, H), (255, 246, 240))
+    d = ImageDraw.Draw(img)
+
+    # 背景のやわらかいグラデーション
+    for y in range(H):
+        t = y / H
+        d.line([(0, y), (W, y)],
+               fill=(int(255 - 0 * t), int(246 + 8 * t), int(240 + 5 * t)))
+
+    def center(text, y, font, fill):
+        d.text(((W - d.textlength(text, font=font)) / 2, y), text, font=font, fill=fill)
+
+    # 監修者の写真(丸く切り抜き)
+    try:
+        ph = Image.open(os.path.join(BASE_DIR, "profile.jpg")).convert("RGB").resize((128, 128))
+        mask = Image.new("L", (128, 128), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, 127, 127], fill=255)
+        img.paste(ph, (W // 2 - 64, 60), mask)
+        d.ellipse([W // 2 - 66, 58, W // 2 + 66, 190], outline=(255, 141, 161), width=5)
+    except Exception:
+        pass
+
+    center("アナウンサー・音声研究者 かしまだちほ(Ph.D) 監修", 212, _font(False, 23), (58, 56, 70))
+    center("あなたの声診断", 252, _font(True, 58), (255, 126, 149))
+
+    y = 332
+    if name:
+        center(f"{name}さんの結果", y, _font(True, 30), (58, 56, 70))
+        y += 44
+    center("総合スコア", y, _font(False, 22), (95, 91, 112))
+    center(str(total), y + 28, _font(True, 110), (59, 191, 159))
+    center("点 / 100点", y + 150, _font(False, 24), (95, 91, 112))
+
+    _draw_radar(d, scores, W // 2, 802, 150, _font(False, 23))
+
+    center("voice-shindan.onrender.com", 1030, _font(False, 23), (154, 150, 170))
+
+    buf = io.BytesIO()
+    img.save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
+@app.route("/ogp.png")
+def ogp_png():
+    name, total, scores = _parse_result_params(request.args)
+    png = _render_card(name, total, scores)
+    return Response(png, mimetype="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
+RESULT_PAGE = """<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="音声学の研究ツール Praat があなたの声を6つの観点で分析します。無料・約1分・登録不要。">
+<meta property="og:image" content="{{ img }}">
+<meta property="og:image:width" content="1080">
+<meta property="og:image:height" content="1080">
+<meta property="og:url" content="{{ page }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ title }}">
+<meta name="twitter:description" content="音声学の研究ツール Praat があなたの声を6つの観点で分析します。無料・約1分・登録不要。">
+<meta name="twitter:image" content="{{ img }}">
+<style>
+ body{margin:0;background:linear-gradient(165deg,#fff6f0,#ffeef5);
+  font-family:"Hiragino Maru Gothic ProN","Yu Gothic",Meiryo,sans-serif;color:#2c2a38;}
+ .wrap{max-width:560px;margin:0 auto;padding:28px 18px 60px;text-align:center;}
+ img.card{width:100%;border-radius:22px;box-shadow:0 10px 30px rgba(255,150,170,.25);}
+ h1{font-size:22px;margin:18px 0 6px;}
+ p{color:#5f5b70;font-size:14px;margin:0 0 22px;}
+ a.btn{display:block;text-decoration:none;background:linear-gradient(135deg,#ff8da1,#57cdc3);
+  color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:16px;
+  box-shadow:0 8px 20px rgba(87,205,195,.35);}
+</style></head>
+<body><div class="wrap">
+ <img class="card" src="{{ img }}" alt="声診断の結果">
+ <h1>あなたの声は何点でしょう?</h1>
+ <p>音声学の研究ツール Praat が、あなたの声を6つの観点で分析します。<br>無料・約1分・登録不要</p>
+ <a class="btn" href="/">🎤 自分も診断してみる</a>
+</div></body></html>"""
+
+
+@app.route("/r")
+def result_page():
+    name, total, scores = _parse_result_params(request.args)
+    base = request.url_root.rstrip("/")
+    qs = f"n={request.args.get('n','')}&t={total}&a={','.join(map(str, scores))}"
+    title = f"{name}さんの声は {total}点 でした｜あなたの声診断" if name else f"声診断の結果は {total}点 でした｜あなたの声診断"
+    return render_template_string(RESULT_PAGE, title=title,
+                                  img=f"{base}/ogp.png?{qs}", page=f"{base}/r?{qs}")
+
+
+# =========================================================================
+#  診断結果をスプレッドシートへ記録(任意)
+# =========================================================================
+
+@app.route("/log", methods=["POST"])
+def log_result():
+    if not SHEET_WEBHOOK_URL:
+        return jsonify({"ok": False, "reason": "not configured"})
+    try:
+        body = request.get_json(force=True, silent=True) or {}
+        row = {
+            "time": datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S"),
+            "name": str(body.get("name", ""))[:12],
+            "sex": str(body.get("sex", ""))[:10],
+            "age": str(body.get("age", ""))[:10],
+            "total": body.get("total"),
+        }
+        for key, label in zip(
+            ["height", "stable", "bright", "open", "volume", "clear"], AXIS_NAMES
+        ):
+            row[key] = (body.get("scores") or {}).get(label)
+        for k in ["f0_med", "f0_low", "f0_high", "range_st", "f1", "f2", "f3",
+                  "jitter", "shimmer", "hnr", "intensity_db"]:
+            v = (body.get("raw") or {}).get(k)
+            row[k] = round(v, 2) if isinstance(v, (int, float)) else None
+
+        req = urllib.request.Request(
+            SHEET_WEBHOOK_URL,
+            data=json.dumps(row, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=8).read()
+        return jsonify({"ok": True})
+    except Exception:
+        # 記録に失敗しても診断そのものは止めない
+        return jsonify({"ok": False})
 
 
 # 同じサーバーから index.html も配信(別サーバー不要に)

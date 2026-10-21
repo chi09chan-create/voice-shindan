@@ -206,6 +206,7 @@
   <div class="card" id="cardProfile">
     <div><span class="step-no">0</span><span class="step-ttl">はじめに</span><span class="opt" style="font-size:12px;color:var(--sub);margin-left:8px">すべて任意です</span></div>
     <p class="hint">入力いただくと、結果がより分かりやすくなります。入力しなくても診断できます。</p>
+    <p class="hint" style="font-size:11px;">※ 診断結果は、サービス改善と統計のため記録させていただきます。音声そのものは保存しません。</p>
 
     <div class="field" style="margin-top:16px;">
       <label>ニックネーム<span class="opt">任意</span></label>
@@ -541,6 +542,7 @@ document.getElementById('analyze').addEventListener('click', ()=>{
   renderResults();
   drawRadar(lastAxes);
   showDetail(rec1Data, rec2Data);
+  sendLog();
   document.getElementById('results').style.display="block";
   document.getElementById('results').scrollIntoView({behavior:'smooth'});
 });
@@ -672,8 +674,37 @@ document.getElementById('startBtn').addEventListener('click', ()=>{
   document.getElementById('cardProfile').scrollIntoView({behavior:'smooth'});
 });
 
+// ---------- 診断結果の記録(集計用・失敗しても診断は止まりません) ----------
+let logged=false;
+function sendLog(){
+  if(logged || !lastAxes) return;
+  logged=true;
+  const scores={}; lastAxes.forEach(a=>{ scores[a.key]=a.score; });
+  const read=(rec2Data&&rec2Data.valid)?rec2Data:rec1Data;
+  const stab=(rec1Data&&rec1Data.valid)?rec1Data:rec2Data;
+  const raw={};
+  ["f0_med","f0_low","f0_high","range_st","f1","f2","f3"].forEach(k=>{ if(read) raw[k]=read[k]; });
+  ["jitter","shimmer","hnr"].forEach(k=>{ if(stab) raw[k]=stab[k]; });
+  if(read) raw.intensity_db=read.intensity_db;
+  try{
+    fetch("log",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({name:PROFILE.name, sex:PROFILE.sex, age:PROFILE.age,
+                            total:lastTotal, scores, raw})
+    }).catch(()=>{});
+  }catch(e){}
+}
+
 // ---------- シェア用の結果画像を作る ----------
-const SHARE_URL = location.origin + location.pathname;
+const SITE_URL = location.origin + location.pathname.replace(/[^/]*$/, "");
+
+// 結果ページのURL(SNSに貼ると、チャート入りの画像が表示されます)
+function resultUrl(){
+  const a = lastAxes.map(x=>x.score).join(",");
+  const q = new URLSearchParams({ n: PROFILE.name || "", t: String(lastTotal), a });
+  return SITE_URL + "r?" + q.toString();
+}
 
 function shareText(){
   const who = PROFILE.name ? `${PROFILE.name}さんの声` : "私の声";
@@ -730,7 +761,7 @@ async function buildShareCanvas(){
   paintRadar(ctx, lastAxes, W/2, 782, 164, 23);
 
   ctx.fillStyle="#9a96aa"; ctx.font=`500 23px ${F}`;
-  ctx.fillText(SHARE_URL.replace(/^https?:\/\//,"").replace(/\/$/,""), W/2, 1034);
+  ctx.fillText(SITE_URL.replace(/^https?:\/\//,"").replace(/\/$/,""), W/2, 1034);
   return cv;
 }
 
@@ -748,15 +779,15 @@ function needResult(){
 // ---------- 各SNSへのシェア ----------
 document.getElementById('shareX').addEventListener('click', ()=>{
   if(needResult()) return;
-  openShare(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText())}&url=${encodeURIComponent(SHARE_URL)}`);
+  openShare(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText())}&url=${encodeURIComponent(resultUrl())}`);
 });
 document.getElementById('shareFB').addEventListener('click', ()=>{
   if(needResult()) return;
-  openShare(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(SHARE_URL)}`);
+  openShare(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(resultUrl())}`);
 });
 document.getElementById('shareLINE').addEventListener('click', ()=>{
   if(needResult()) return;
-  openShare(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(SHARE_URL)}&text=${encodeURIComponent(shareText())}`);
+  openShare(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(resultUrl())}&text=${encodeURIComponent(shareText())}`);
 });
 document.getElementById('shareIG').addEventListener('click', async ()=>{
   if(needResult()) return;

@@ -116,6 +116,7 @@
   .row{display:flex; gap:10px;}
   .row > *{flex:1;}
   .note{font-size:12px; color:var(--sub); margin-top:18px; text-align:center;}
+  .disclaimer{font-size:12px; color:var(--sub); margin:16px 0 0; padding:10px 12px; border-radius:12px; background:#f7f5fa; line-height:1.6;}
 
   /* ---- サンプル結果(体験前の見本) ---- */
   .sample-card{background:linear-gradient(170deg,#fff,#fff8fa); position:relative; overflow:hidden;}
@@ -207,6 +208,7 @@
     <div><span class="step-no">0</span><span class="step-ttl">はじめに</span><span class="opt" style="font-size:12px;color:var(--sub);margin-left:8px">すべて任意です</span></div>
     <p class="hint">入力いただくと、結果がより分かりやすくなります。入力しなくても診断できます。</p>
     <p class="hint" style="font-size:11px;">※ 診断結果は、サービス改善と統計のため記録させていただきます。音声そのものは保存しません。</p>
+    <p class="hint" style="font-size:11px;">※ 声の傾向を楽しく知るための診断です。医療的な診断ではありません。</p>
 
     <div class="field" style="margin-top:16px;">
       <label>ニックネーム<span class="opt">任意</span></label>
@@ -301,6 +303,7 @@
     <p class="sns-note">※ Instagramは外部から直接投稿できないため、画像の保存と投稿文のコピーを行います</p>
     <button class="btn-ghost" id="saveImg" style="width:100%;margin-top:10px;">🖼 結果画像を保存する</button>
     <button class="btn-cta" id="cta" style="margin-top:12px;">🎯 無料体験レッスンに申し込む</button>
+    <p class="disclaimer">※ この診断は、声の傾向を楽しく知るためのものです。<b>医療的な診断ではありません。</b><br>声やのどの不調が気になるときは、耳鼻咽喉科などの医療機関にご相談ください。</p>
     <p class="note">※ Praat(音声学の研究ツール)による解析です。点数の基準値は指導方針に合わせて調整できます。</p>
   </div>
 
@@ -316,7 +319,7 @@
 const CTA_URL = "#"; // ←ここに体験予約ページのURLを入れてください
 let rec1Data=null, rec2Data=null;
 let DIALECT="標準";
-let lastAxes=null, lastTotal=null;
+let lastAxes=null, lastTotal=null, lastShare=null;
 const PROFILE={name:"", sex:"", age:""};
 
 const AXES = ["高さ・音域","声の安定性","響き・明るさ","口の開き","声量","クリアさ"];
@@ -488,57 +491,41 @@ function checkReady(){
     !((rec1Data&&rec1Data.valid) || (rec2Data&&rec2Data.valid));
 }
 
-function avg(a){ return a.reduce((s,v)=>s+v,0)/(a.length||1); }
-function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
-function num(v,d){ return (v===null||v===undefined||Number.isNaN(v))? d : v; }
 function band(s){ return s>=75?2 : s>=50?1 : 0; }
 function totalBand(s){ return s>=75?2 : s>=55?1 : 0; }
 
-// ---------- スコア化(基準値は指導方針に合わせ調整可) ----------
-function scoreFrom(rA, rB){
-  const stab = (rA && rA.valid) ? rA : (rB||{});
-  const read = (rB && rB.valid) ? rB : (rA||{});
-
-  const rangeSt = num(read.range_st, 4);
-  const sHeight = clamp(Math.round(rangeSt/12*100), 5, 100);
-
-  const jit = num(stab.jitter, 1.5), shim = num(stab.shimmer, 6);
-  const sJit = clamp(100-(jit-0.4)*45, 5, 100);
-  const sShim = clamp(100-(shim-2.0)*13, 5, 100);
-  const sStable = Math.round((sJit+sShim)/2);
-
-  const f2 = num(read.f2, 1500);
-  const sBright = clamp(Math.round((f2-1200)/1100*100), 5, 100);
-
-  const f1 = num(read.f1, 450);
-  const sOpen = clamp(Math.round((f1-350)/350*100), 5, 100);
-
-  const db = num(read.intensity_db, 62);
-  const sVolume = clamp(Math.round((db-52)/28*100), 5, 100);
-
-  const hnr = num(stab.hnr, 12);
-  const sClear = clamp(Math.round((hnr-5)/18*100), 5, 100);
-
-  return [
-    {key:"高さ・音域", score:sHeight},
-    {key:"声の安定性", score:sStable},
-    {key:"響き・明るさ", score:sBright},
-    {key:"口の開き",   score:sOpen},
-    {key:"声量",       score:sVolume},
-    {key:"クリアさ",   score:sClear},
-  ];
+// ---------- スコア化 ----------
+// 点数はサーバー(app.py の score_from)で計算します。基準値の調整もそちらで行います。
+// サーバーは本物の診断結果にだけ署名を付けるので、点数を書き換えた結果画像は作れません。
+async function scoreServer(rA, rB){
+  const res=await fetch("score",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({rA, rB, name:PROFILE.name})
+  });
+  const j=await res.json();
+  if(!j.ok) throw new Error("score failed");
+  return j;
 }
 
 // ---------- 表示 ----------
-document.getElementById('analyze').addEventListener('click', ()=>{
+document.getElementById('analyze').addEventListener('click', async ()=>{
   const statusA=document.getElementById('statusA');
   if(!(rec1Data&&rec1Data.valid) && !(rec2Data&&rec2Data.valid)){
     statusA.textContent="⚠ 声をうまく検出できませんでした。静かな場所でもう一度お試しください。";
     statusA.className="status err"; return;
   }
+  let sc;
+  try{
+    sc=await scoreServer(rec1Data, rec2Data);
+  }catch(e){
+    statusA.textContent="⚠ 結果を計算できませんでした。もう一度「結果を見る」を押してください。";
+    statusA.className="status err"; return;
+  }
   statusA.textContent="";
-  lastAxes=scoreFrom(rec1Data, rec2Data);
-  lastTotal=Math.round(avg(lastAxes.map(a=>a.score)));
+  lastAxes=AXES.map((key,i)=>({key, score:sc.scores[i]}));
+  lastTotal=sc.total;
+  lastShare=sc.share;
   renderResults();
   drawRadar(lastAxes);
   showDetail(rec1Data, rec2Data);
@@ -702,8 +689,8 @@ const SITE_URL = location.origin + location.pathname.replace(/[^/]*$/, "");
 
 // 結果ページのURL(SNSに貼ると、チャート入りの画像が表示されます)
 function resultUrl(){
-  const a = lastAxes.map(x=>x.score).join(",");
-  const q = new URLSearchParams({ n: PROFILE.name || "", t: String(lastTotal), a });
+  // サーバーが署名したパラメータをそのまま使う(書き換えると画像に点数が出なくなる)
+  const q = new URLSearchParams({ n: lastShare.n, t: String(lastShare.t), a: lastShare.a, s: lastShare.s });
   return SITE_URL + "r?" + q.toString();
 }
 

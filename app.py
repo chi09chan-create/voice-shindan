@@ -6,10 +6,13 @@
 ローカル起動: python app.py  → http://localhost:5000
 本番(Render): gunicorn app:app
 """
+import hashlib
+import hmac
 import io
 import json
 import math
 import os
+import secrets
 import sys
 import urllib.request
 from functools import lru_cache
@@ -44,6 +47,27 @@ JST = timezone(timedelta(hours=9))
 
 # 結果をスプレッドシートへ送る先(Renderの環境変数で設定。未設定なら記録しない)
 SHEET_WEBHOOK_URL = os.environ.get("SHEET_WEBHOOK_URL", "").strip()
+
+# 診断結果に付ける署名の鍵(Renderの環境変数 SHARE_SECRET で設定)
+# 未設定だと起動のたびに鍵が変わり、以前シェアしたリンクの画像が出なくなる
+SHARE_SECRET = os.environ.get("SHARE_SECRET", "").strip()
+if not SHARE_SECRET:
+    print("注意: SHARE_SECRET が未設定です。一時的な鍵で起動します。", file=sys.stderr)
+    SHARE_SECRET = secrets.token_hex(32)
+_KEY = SHARE_SECRET.encode("utf-8")
+
+
+def _sign(purpose, payload):
+    """payload(dict)に署名する。purpose を混ぜて、用途の違う署名を使い回せないようにする"""
+    # 数値はすべて小数として扱う(ブラウザを経由すると 5.0 が 5 に変わるため)
+    norm = {k: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+            for k, v in payload.items()}
+    msg = purpose + ":" + json.dumps(norm, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hmac.new(_KEY, msg.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+
+
+def _verify(purpose, payload, sig):
+    return isinstance(sig, str) and hmac.compare_digest(_sign(purpose, payload), sig)
 
 
 @lru_cache(maxsize=32)
@@ -157,7 +181,88 @@ def analyze():
         res = analyze_sound(values, sr)
     except Exception:
         return jsonify({"valid": False, "error": "analysis failed"})
+    # サーバーで解析した本物の値であることの印
+    res["sig"] = _sign("analysis", res)
     return jsonify(res)
+
+
+# =========================================================================
+#  点数をつける(基準値は指導方針に合わせて調整可)
+#  点数はサーバーで計算する。画面側で計算すると、点数を書き換えた
+#  偽の結果画像を作れてしまうため
+# =========================================================================
+
+def _jsround(x):
+    """JavaScript の Math.round と同じ四捨五入(Python の round は .5 を偶数に丸める)"""
+    return int(math.floor(x + 0.5))
+
+
+def _clamp(v, lo, hi):
+    return max(lo, min(hi, v))
+
+
+def _num(v, default):
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or math.isnan(v):
+        return default
+    return v
+
+
+def score_from(rA, rB):
+    stab = rA if rA.get("valid") else rB
+    read = rB if rB.get("valid") else rA
+
+    range_st = _num(read.get("range_st"), 4)
+    s_height = _clamp(_jsround(range_st / 12 * 100), 5, 100)
+
+    jit = _num(stab.get("jitter"), 1.5)
+    shim = _num(stab.get("shimmer"), 6)
+    s_jit = _clamp(100 - (jit - 0.4) * 45, 5, 100)
+    s_shim = _clamp(100 - (shim - 2.0) * 13, 5, 100)
+    s_stable = _jsround((s_jit + s_shim) / 2)
+
+    f2 = _num(read.get("f2"), 1500)
+    s_bright = _clamp(_jsround((f2 - 1200) / 1100 * 100), 5, 100)
+
+    f1 = _num(read.get("f1"), 450)
+    s_open = _clamp(_jsround((f1 - 350) / 350 * 100), 5, 100)
+
+    db = _num(read.get("intensity_db"), 62)
+    s_volume = _clamp(_jsround((db - 52) / 28 * 100), 5, 100)
+
+    hnr = _num(stab.get("hnr"), 12)
+    s_clear = _clamp(_jsround((hnr - 5) / 18 * 100), 5, 100)
+
+    return [s_height, s_stable, s_bright, s_open, s_volume, s_clear]
+
+
+def _checked_analysis(r):
+    """/analyze が返した結果か(署名が正しいか)を確かめる。正しくなければ空の結果"""
+    if not isinstance(r, dict):
+        return {"valid": False}
+    body = {k: v for k, v in r.items() if k != "sig"}
+    if not _verify("analysis", body, r.get("sig")):
+        return {"valid": False}
+    return body
+
+
+def _share_params(name, total, scores):
+    """結果ページ・結果画像のURLに付けるパラメータ(署名入り)"""
+    a = ",".join(map(str, scores))
+    return {"n": name, "t": total, "a": a, "s": _sign("share", {"n": name, "t": total, "a": a})}
+
+
+@app.route("/score", methods=["POST"])
+def score():
+    body = request.get_json(force=True, silent=True) or {}
+    rA = _checked_analysis(body.get("rA"))
+    rB = _checked_analysis(body.get("rB"))
+    if not (rA.get("valid") or rB.get("valid")):
+        return jsonify({"ok": False}), 400
+    scores = score_from(rA, rB)
+    total = _jsround(sum(scores) / len(scores))
+    name = str(body.get("name", "") or "")[:12]
+    return jsonify({"ok": True, "scores": scores, "total": total,
+                    "share": _share_params(name, total, scores)})
 
 
 # =========================================================================
@@ -180,6 +285,9 @@ def _parse_result_params(args):
             scores.append(0)
     while len(scores) < 6:
         scores.append(0)
+    # 署名が合わない(URLを書き換えた)ときは、点数を出さない
+    if not _verify("share", {"n": name, "t": total, "a": ",".join(map(str, scores))}, args.get("s")):
+        return None
     return name, total, scores
 
 
@@ -192,12 +300,13 @@ def _draw_radar(d, scores, cx, cy, R, font):
         d.polygon([(cx + r * math.cos(ang(i)), cy + r * math.sin(ang(i))) for i in range(n)],
                   outline=(190, 182, 196))
 
-    pts = [(cx + R * scores[i] / 100 * math.cos(ang(i)),
-            cy + R * scores[i] / 100 * math.sin(ang(i))) for i in range(n)]
-    d.polygon(pts, fill=(255, 176, 190), outline=(255, 141, 161))
-    d.line(pts + [pts[0]], fill=(255, 141, 161), width=4)
-    for px, py in pts:
-        d.ellipse([px - 6, py - 6, px + 6, py + 6], fill=(87, 205, 195), outline=(255, 255, 255), width=3)
+    if any(scores):  # 点数のない案内用の画像では、目盛りと項目名だけ描く
+        pts = [(cx + R * scores[i] / 100 * math.cos(ang(i)),
+                cy + R * scores[i] / 100 * math.sin(ang(i))) for i in range(n)]
+        d.polygon(pts, fill=(255, 176, 190), outline=(255, 141, 161))
+        d.line(pts + [pts[0]], fill=(255, 141, 161), width=4)
+        for px, py in pts:
+            d.ellipse([px - 6, py - 6, px + 6, py + 6], fill=(87, 205, 195), outline=(255, 255, 255), width=3)
 
     for i, label in enumerate(AXIS_NAMES[:n]):
         a = ang(i)
@@ -241,12 +350,18 @@ def _render_card(name, total, scores):
     center("あなたの声診断", LX, 204, _font(True, 54), (255, 126, 149))
 
     y = 284
-    if name:
-        center(f"{name}さんの結果", LX, y, _font(True, 28), (58, 56, 70))
-        y += 42
-    center("総合スコア", LX, y, _font(False, 20), (95, 91, 112))
-    center(str(total), LX, y + 18, _font(True, 116), (59, 191, 159))
-    center("点 / 100点", LX, y + 158, _font(False, 22), (95, 91, 112))
+    if total is None:
+        # 本物の結果でないときは、点数のない案内用の画像にする
+        center("あなたの声は何点?", LX, y + 40, _font(True, 44), (59, 191, 159))
+        center("6つの観点で声を分析します", LX, y + 120, _font(False, 24), (95, 91, 112))
+        center("無料・約1分・登録不要", LX, y + 162, _font(False, 24), (95, 91, 112))
+    else:
+        if name:
+            center(f"{name}さんの結果", LX, y, _font(True, 28), (58, 56, 70))
+            y += 42
+        center("総合スコア", LX, y, _font(False, 20), (95, 91, 112))
+        center(str(total), LX, y + 18, _font(True, 116), (59, 191, 159))
+        center("点 / 100点", LX, y + 158, _font(False, 22), (95, 91, 112))
 
     center("voice-shindan.onrender.com", LX, 584, _font(False, 18), (154, 150, 170))
 
@@ -261,7 +376,7 @@ def _render_card(name, total, scores):
 
 @app.route("/ogp.png")
 def ogp_png():
-    name, total, scores = _parse_result_params(request.args)
+    name, total, scores = _parse_result_params(request.args) or ("", None, [0] * 6)
     png = _render_card(name, total, scores)
     return Response(png, mimetype="image/png",
                     headers={"Cache-Control": "public, max-age=86400"})
@@ -301,15 +416,22 @@ RESULT_PAGE = """<!DOCTYPE html>
  <h1>あなたの声は何点でしょう?</h1>
  <p>音声学の研究ツール Praat が、あなたの声を6つの観点で分析します。<br>無料・約1分・登録不要</p>
  <a class="btn" href="/">🎤 自分も診断してみる</a>
+ <p style="font-size:11px;margin:18px 0 0;">※ 声の傾向を楽しく知るための診断です。医療的な診断ではありません。</p>
 </div></body></html>"""
 
 
 @app.route("/r")
 def result_page():
-    name, total, scores = _parse_result_params(request.args)
     base = request.url_root.rstrip("/")
-    qs = urlencode({"n": name, "t": total, "a": ",".join(map(str, scores))})
-    title = f"{name}さんの声は {total}点 でした｜あなたの声診断" if name else f"声診断の結果は {total}点 でした｜あなたの声診断"
+    parsed = _parse_result_params(request.args)
+    if parsed is None:
+        # 署名が合わないURLは、点数のない案内ページにする
+        qs = ""
+        title = "あなたの声は何点?｜あなたの声診断"
+    else:
+        name, total, scores = parsed
+        qs = urlencode(_share_params(name, total, scores))
+        title = f"{name}さんの声は {total}点 でした｜あなたの声診断" if name else f"声診断の結果は {total}点 でした｜あなたの声診断"
     return render_template_string(RESULT_PAGE, title=title,
                                   img=f"{base}/ogp.png?{qs}", page=f"{base}/r?{qs}")
 

@@ -116,6 +116,55 @@
   .row{display:flex; gap:10px;}
   .row > *{flex:1;}
   .note{font-size:12px; color:var(--sub); margin-top:18px; text-align:center;}
+
+  /* ---- サンプル結果(体験前の見本) ---- */
+  .sample-card{background:linear-gradient(170deg,#fff,#fff8fa); position:relative; overflow:hidden;}
+  .sample-badges{display:flex; gap:7px; justify-content:center; flex-wrap:wrap; margin-bottom:12px;}
+  .pill{font-size:12px; font-weight:800; background:var(--card2); color:var(--accent);
+    border:1.5px solid #ffd3dd; border-radius:99px; padding:4px 11px;}
+  .sample-ttl{text-align:center; font-weight:800; font-size:17px; margin:2px 0 0;}
+  .sample-sub{text-align:center; font-size:12px; color:var(--sub); margin:2px 0 6px;}
+  .sample-wrap{display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;}
+  canvas#sampleRadar{display:block; max-width:100%;}
+  .sample-score{text-align:center; margin:-6px 0 10px;}
+  .sample-score b{font-size:46px; font-weight:800;
+    background:linear-gradient(90deg,#ff7e95,#3bbf9f);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+  .sample-score span{font-size:14px; color:var(--sub); margin-left:4px;}
+  .sample-tips{list-style:none; margin:0 0 16px; padding:0;}
+  .sample-tips li{background:var(--card2); border-radius:14px; padding:11px 14px;
+    font-size:13px; margin-bottom:8px; color:#3a3846;}
+  .sample-tips b{color:var(--accent);}
+  .sample-tag{position:absolute; top:14px; right:-34px; transform:rotate(38deg);
+    background:var(--accent2); color:#fff; font-size:11px; font-weight:800;
+    padding:4px 38px;}
+
+  /* ---- プロフィール入力 ---- */
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:14px; font-weight:700; margin-bottom:6px;}
+  .field .opt{font-size:11px; color:var(--sub); font-weight:500; margin-left:6px;}
+  .field input[type=text]{
+    width:100%; font-family:inherit; font-size:16px; padding:13px 14px;
+    border:2px solid var(--line); border-radius:14px; background:var(--card2); color:var(--text);
+  }
+  .field input[type=text]:focus{outline:none; border-color:var(--accent); background:#fff;}
+  .chips{display:flex; gap:7px; flex-wrap:wrap;}
+  .chips button{
+    background:var(--card2); color:var(--sub); border:2px solid var(--line);
+    font-size:14px; padding:10px 14px; border-radius:99px; font-weight:700; flex:0 0 auto;
+  }
+  .chips button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff; border-color:transparent;}
+
+  /* ---- SNSシェアボタン ---- */
+  .sns-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .sns{flex:1; min-width:74px; color:#fff; font-size:13px; font-weight:800;
+    padding:14px 6px; border-radius:14px; line-height:1.2;}
+  .sns.x{background:#000;}
+  .sns.ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);}
+  .sns.fb{background:#1877F2;}
+  .sns.line{background:#06C755;}
+  .sns-note{font-size:11px; color:var(--sub); margin:8px 0 0; text-align:center;}
 </style>
 </head>
 <body>
@@ -132,6 +181,59 @@
     <h1>あなたの声診断</h1>
     <span class="badge">🔬 Praat解析版</span>
     <p class="lead">2つの録音をするだけ♪ 音声学の研究ツール Praat が、<br>あなたの声を6つの観点でやさしく分析します。</p>
+  </div>
+
+  <!-- SAMPLE -->
+  <div class="card sample-card">
+    <div class="sample-tag">SAMPLE</div>
+    <div class="sample-badges">
+      <span class="pill">🆓 無料</span>
+      <span class="pill">⏱ 約1分</span>
+      <span class="pill">✍️ 登録不要</span>
+    </div>
+    <p class="sample-ttl">こんな結果が出ます</p>
+    <p class="sample-sub">↓ これは見本です。あなたの声はどうでしょう?</p>
+    <div class="sample-wrap"><canvas id="sampleRadar" width="310" height="290"></canvas></div>
+    <div class="sample-score"><b>74</b><span>点 / 100点</span></div>
+    <ul class="sample-tips">
+      <li><b>響き・明るさ 84点</b><br>明るく前に通る、よく響く声です!</li>
+      <li><b>口の開き 61点</b><br>口の開きが標準的です。母音をはっきり開くと、もっと明瞭になります。</li>
+    </ul>
+    <button class="btn-cta" id="startBtn">▼ さっそく診断してみる</button>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="card" id="cardProfile">
+    <div><span class="step-no">0</span><span class="step-ttl">はじめに</span><span class="opt" style="font-size:12px;color:var(--sub);margin-left:8px">すべて任意です</span></div>
+    <p class="hint">入力いただくと、結果がより分かりやすくなります。入力しなくても診断できます。</p>
+
+    <div class="field" style="margin-top:16px;">
+      <label>ニックネーム<span class="opt">任意</span></label>
+      <input type="text" id="pfName" maxlength="12" placeholder="例:ちほ" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label>性別<span class="opt">任意</span></label>
+      <div class="chips" id="pfSex">
+        <button data-v="女性">女性</button>
+        <button data-v="男性">男性</button>
+        <button data-v="その他">その他</button>
+        <button data-v="">答えない</button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:0;">
+      <label>年代<span class="opt">任意</span></label>
+      <div class="chips" id="pfAge">
+        <button data-v="10代">10代</button>
+        <button data-v="20代">20代</button>
+        <button data-v="30代">30代</button>
+        <button data-v="40代">40代</button>
+        <button data-v="50代">50代</button>
+        <button data-v="60代以上">60代以上</button>
+        <button data-v="">答えない</button>
+      </div>
+    </div>
   </div>
 
   <!-- STEP 1 -->
@@ -164,6 +266,7 @@
 
   <!-- RESULTS -->
   <div class="card" id="results">
+    <p id="resultWho" style="text-align:center;font-weight:800;margin:0 0 6px;font-size:17px"></p>
     <div class="score-big">
       <div class="num" id="totalScore">--</div>
       <div class="label">あなたの声 総合スコア(100点満点)</div>
@@ -187,10 +290,15 @@
       <table id="detailTable"></table>
     </div>
 
-    <div class="row" style="margin-top:18px;">
-      <button class="btn-ghost" id="share">📲 結果をシェア</button>
-      <button class="btn-ghost" id="saveImg">🖼 画像で保存</button>
+    <span class="dialect-label" style="margin-top:20px;display:block">📣 結果をシェアする</span>
+    <div class="sns-row">
+      <button class="sns x" id="shareX">X</button>
+      <button class="sns ig" id="shareIG">Instagram</button>
+      <button class="sns fb" id="shareFB">Facebook</button>
+      <button class="sns line" id="shareLINE">LINE</button>
     </div>
+    <p class="sns-note">※ Instagramは外部から直接投稿できないため、画像の保存と投稿文のコピーを行います</p>
+    <button class="btn-ghost" id="saveImg" style="width:100%;margin-top:10px;">🖼 結果画像を保存する</button>
     <button class="btn-cta" id="cta" style="margin-top:12px;">🎯 無料体験レッスンに申し込む</button>
     <p class="note">※ Praat(音声学の研究ツール)による解析です。点数の基準値は指導方針に合わせて調整できます。</p>
   </div>
@@ -208,6 +316,7 @@ const CTA_URL = "#"; // ←ここに体験予約ページのURLを入れてく�
 let rec1Data=null, rec2Data=null;
 let DIALECT="標準";
 let lastAxes=null, lastTotal=null;
+const PROFILE={name:"", sex:"", age:""};
 
 const AXES = ["高さ・音域","声の安定性","響き・明るさ","口の開き","声量","クリアさ"];
 
@@ -438,6 +547,8 @@ document.getElementById('analyze').addEventListener('click', ()=>{
 
 function renderResults(){
   if(!lastAxes) return;
+  const who=document.getElementById('resultWho');
+  who.textContent = PROFILE.name ? `${PROFILE.name}さんの診断結果` : "";
   document.getElementById('totalScore').textContent=lastTotal;
   document.getElementById('totalComment').textContent=TIPS[DIALECT].total[totalBand(lastTotal)];
   const ul=document.getElementById('axisList'); ul.innerHTML="";
@@ -460,12 +571,8 @@ document.getElementById('dialectSeg').addEventListener('click', e=>{
   renderResults();
 });
 
-function drawRadar(axes){
-  const cv=document.getElementById('radar'), ctx=cv.getContext('2d');
-  const W=cv.width, H=cv.height, cx=W/2, cy=H/2+8, R=108;
-  ctx.clearRect(0,0,W,H);
-  const N=axes.length;
-  const ang=i=>-Math.PI/2 + i*2*Math.PI/N;
+function paintRadar(ctx, axes, cx, cy, R, fontSize){
+  const N=axes.length, ang=i=>-Math.PI/2 + i*2*Math.PI/N;
   for(let g=1;g<=4;g++){
     ctx.beginPath();
     for(let i=0;i<=N;i++){
@@ -473,13 +580,14 @@ function drawRadar(axes){
       const px=cx+r*Math.cos(a), py=cy+r*Math.sin(a);
       i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
     }
-    ctx.strokeStyle="rgba(120,110,130,.16)"; ctx.stroke();
+    ctx.strokeStyle="rgba(120,110,130,.16)"; ctx.lineWidth=Math.max(1,R/110); ctx.stroke();
   }
-  ctx.fillStyle="#7a7790"; ctx.font="13px sans-serif";
+  ctx.fillStyle="#7a7790";
+  ctx.font=`${fontSize}px "Hiragino Maru Gothic ProN","Yu Gothic",sans-serif`;
   ctx.textAlign="center"; ctx.textBaseline="middle";
   axes.forEach((a,i)=>{
-    const aa=ang(i), lx=cx+(R+28)*Math.cos(aa), ly=cy+(R+20)*Math.sin(aa);
-    ctx.fillText(a.key, lx, ly);
+    const aa=ang(i);
+    ctx.fillText(a.key, cx+(R+fontSize*2.0)*Math.cos(aa), cy+(R+fontSize*1.5)*Math.sin(aa));
   });
   ctx.beginPath();
   axes.forEach((a,i)=>{
@@ -488,17 +596,23 @@ function drawRadar(axes){
     i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
   });
   ctx.closePath();
-  const grad=ctx.createLinearGradient(0,0,W,H);
+  const grad=ctx.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
   grad.addColorStop(0,"rgba(255,141,161,.45)");
   grad.addColorStop(1,"rgba(87,205,195,.45)");
   ctx.fillStyle=grad; ctx.fill();
-  ctx.strokeStyle="#ff8da1"; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.strokeStyle="#ff8da1"; ctx.lineWidth=Math.max(2,R/45); ctx.stroke();
   axes.forEach((a,i)=>{
     const r=R*a.score/100, aa=ang(i);
-    ctx.beginPath(); ctx.arc(cx+r*Math.cos(aa), cy+r*Math.sin(aa),3.5,0,7);
+    ctx.beginPath(); ctx.arc(cx+r*Math.cos(aa), cy+r*Math.sin(aa), Math.max(3,R/32),0,7);
     ctx.fillStyle="#57cdc3"; ctx.fill();
-    ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=Math.max(2,R/55); ctx.stroke();
   });
+}
+
+function drawRadar(axes){
+  const cv=document.getElementById('radar'), ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  paintRadar(ctx, axes, cv.width/2, cv.height/2+8, 106, 13);
 }
 
 function showDetail(rA,rB){
@@ -506,6 +620,9 @@ function showDetail(rA,rB){
   const r=(rB&&rB.valid)?rB:rA;
   const s=(rA&&rA.valid)?rA:rB;
   const fix=(v,u,d=0)=> (v===null||v===undefined)? "—" : v.toFixed(d)+u;
+  if(PROFILE.name) rows.push(["ニックネーム", PROFILE.name]);
+  if(PROFILE.sex)  rows.push(["性別", PROFILE.sex]);
+  if(PROFILE.age)  rows.push(["年代", PROFILE.age]);
   if(r&&r.valid){
     rows.push(["平均の高さ(F0)", fix(r.f0_med," Hz")]);
     rows.push(["音域(下〜上)", `${Math.round(r.f0_low)}〜${Math.round(r.f0_high)} Hz (${r.range_st.toFixed(1)}半音)`]);
@@ -523,18 +640,147 @@ function showDetail(rA,rB){
     rows.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td></tr>`).join("");
 }
 
-// ---------- シェア・保存・CTA ----------
-document.getElementById('share').addEventListener('click', async ()=>{
-  const total=document.getElementById('totalScore').textContent;
-  const text=`私の声 総合スコアは ${total}点 でした!🎤 #あなたの声診断`;
-  if(navigator.share){ try{ await navigator.share({title:"あなたの声診断",text}); }catch(e){} }
-  else { try{ await navigator.clipboard.writeText(text); alert("結果をコピーしました!SNSに貼り付けてください。"); }catch(e){ alert(text); } }
+// ---------- プロフィール入力(すべて任意) ----------
+document.getElementById('pfName').addEventListener('input', e=>{
+  PROFILE.name = e.target.value.trim();
 });
-document.getElementById('saveImg').addEventListener('click', ()=>{
-  const cv=document.getElementById('radar');
+function setupChips(id, key){
+  document.getElementById(id).addEventListener('click', e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    const already=b.classList.contains('on');
+    [...document.querySelectorAll('#'+id+' button')].forEach(x=>x.classList.remove('on'));
+    if(!already){ b.classList.add('on'); PROFILE[key]=b.dataset.v; }
+    else { PROFILE[key]=""; }
+  });
+}
+setupChips('pfSex','sex');
+setupChips('pfAge','age');
+
+// ---------- サンプル結果(ページを開いたとき) ----------
+const SAMPLE_AXES=[
+  {key:"高さ・音域", score:72},{key:"声の安定性", score:70},
+  {key:"響き・明るさ", score:84},{key:"口の開き", score:61},
+  {key:"声量", score:75},{key:"クリアさ", score:80}
+];
+(function drawSample(){
+  const cv=document.getElementById('sampleRadar'); if(!cv) return;
+  const ctx=cv.getContext('2d');
+  paintRadar(ctx, SAMPLE_AXES, cv.width/2, cv.height/2+4, 90, 12);
+})();
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  document.getElementById('cardProfile').scrollIntoView({behavior:'smooth'});
+});
+
+// ---------- シェア用の結果画像を作る ----------
+const SHARE_URL = location.origin + location.pathname;
+
+function shareText(){
+  const who = PROFILE.name ? `${PROFILE.name}さんの声` : "私の声";
+  return `${who} 総合スコアは ${lastTotal}点 でした!🎤
+` +
+         `アナウンサー・音声研究者 かしまだちほ(Ph.D)監修「あなたの声診断」
+` +
+         `#あなたの声診断 #ボイトレ #声診断`;
+}
+
+function loadImg(src){
+  return new Promise(res=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src; });
+}
+
+async function buildShareCanvas(){
+  const W=1080,H=1080, F='"Hiragino Maru Gothic ProN","Yu Gothic",Meiryo,sans-serif';
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,"#fff6f0"); bg.addColorStop(1,"#ffeef5");
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+
+  const photo=await loadImg('profile.jpg');
+  if(photo){
+    ctx.save();
+    ctx.beginPath(); ctx.arc(W/2,128,64,0,7); ctx.closePath(); ctx.clip();
+    ctx.drawImage(photo, W/2-64, 64, 128, 128);
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(W/2,128,64,0,7);
+    ctx.strokeStyle="#ff8da1"; ctx.lineWidth=5; ctx.stroke();
+  }
+  ctx.fillStyle="#3a3846"; ctx.font=`500 23px ${F}`;
+  ctx.fillText("アナウンサー・音声研究者 かしまだちほ(Ph.D) 監修", W/2, 230);
+
+  const tg=ctx.createLinearGradient(W/2-230,0,W/2+230,0);
+  tg.addColorStop(0,"#ff7e95"); tg.addColorStop(1,"#3bbf9f");
+  ctx.fillStyle=tg; ctx.font=`800 58px ${F}`;
+  ctx.fillText("あなたの声診断", W/2, 296);
+
+  if(PROFILE.name){
+    ctx.fillStyle="#3a3846"; ctx.font=`800 30px ${F}`;
+    ctx.fillText(`${PROFILE.name}さんの結果`, W/2, 348);
+  }
+  const yBase = PROFILE.name ? 372 : 356;
+
+  ctx.fillStyle="#5f5b70"; ctx.font=`500 22px ${F}`;
+  ctx.fillText("総合スコア", W/2, yBase);
+  ctx.fillStyle=tg; ctx.font=`800 126px ${F}`;
+  ctx.fillText(String(lastTotal), W/2, yBase+112);
+  ctx.fillStyle="#5f5b70"; ctx.font=`500 24px ${F}`;
+  ctx.fillText("点 / 100点", W/2, yBase+150);
+
+  paintRadar(ctx, lastAxes, W/2, 782, 164, 23);
+
+  ctx.fillStyle="#9a96aa"; ctx.font=`500 23px ${F}`;
+  ctx.fillText(SHARE_URL.replace(/^https?:\/\//,"").replace(/\/$/,""), W/2, 1034);
+  return cv;
+}
+
+function downloadCanvas(cv){
   const a=document.createElement('a');
   a.download="voice-result.png"; a.href=cv.toDataURL("image/png"); a.click();
+}
+function canvasToBlob(cv){ return new Promise(r=>cv.toBlob(r,"image/png")); }
+function openShare(url){ window.open(url,"_blank","noopener,noreferrer"); }
+function needResult(){
+  if(!lastAxes){ alert("先に診断をしてください。"); return true; }
+  return false;
+}
+
+// ---------- 各SNSへのシェア ----------
+document.getElementById('shareX').addEventListener('click', ()=>{
+  if(needResult()) return;
+  openShare(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText())}&url=${encodeURIComponent(SHARE_URL)}`);
 });
+document.getElementById('shareFB').addEventListener('click', ()=>{
+  if(needResult()) return;
+  openShare(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(SHARE_URL)}`);
+});
+document.getElementById('shareLINE').addEventListener('click', ()=>{
+  if(needResult()) return;
+  openShare(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(SHARE_URL)}&text=${encodeURIComponent(shareText())}`);
+});
+document.getElementById('shareIG').addEventListener('click', async ()=>{
+  if(needResult()) return;
+  const cv=await buildShareCanvas();
+  // スマホ:共有メニューからInstagramを選べる
+  try{
+    const blob=await canvasToBlob(cv);
+    const file=new File([blob],"voice-result.png",{type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], text:shareText()});
+      return;
+    }
+  }catch(e){ if(e && e.name==="AbortError") return; }
+  // PCなど:画像を保存して投稿文をコピー
+  downloadCanvas(cv);
+  try{ await navigator.clipboard.writeText(shareText()); }catch(e){}
+  alert("結果画像を保存し、投稿文をコピーしました。\n\nInstagramを開いて、保存した画像を投稿してください。\n(Instagramは他のSNSと違い、外部から直接投稿できない仕組みのためです)");
+});
+
+document.getElementById('saveImg').addEventListener('click', async ()=>{
+  if(needResult()) return;
+  downloadCanvas(await buildShareCanvas());
+});
+
 document.getElementById('cta').addEventListener('click', ()=>{
   if(CTA_URL && CTA_URL!=="#") location.href=CTA_URL;
   else alert("ここに体験レッスンの予約ページを設定できます(CTA_URL を編集)。");

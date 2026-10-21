@@ -28,17 +28,23 @@
 | `fonts/` | Noto Sans JP(結果画像の日本語表示に使う。OFLライセンス) |
 | `requirements.txt` | 必要な Python パッケージ |
 | `render.yaml` | Render の設定(Python 3.11.9、gunicorn) |
+| `start-windows.bat` / `start-mac.command` | 手元で起動するためのボタン |
+| `launcher.py` | 人に配る Windows 用アプリ(.exe)を作るときの入口 |
 
 サーバーは `PUBLIC_FILES` に入っているファイルしか配信しない(ソースを外から見えなくするため)。
 
-## 手元で動かす(Mac)
+## 2台のPCで作業する
 
-```bash
-python3 -m pip install -r requirements.txt
-python3 app.py
-```
+Windows PC と Mac mini の両方で、このリポジトリを使う。ルールは `CLAUDE.md` にまとめてある(始める前に `git pull`、終わったら `git push`)。
 
-ブラウザで http://localhost:5000 を開く。マイクを使うので localhost で開くこと。
+## 手元で動かす
+
+- Windows:`start-windows.bat` をダブルクリック → http://localhost:5000
+- Mac:`start-mac.command` をダブルクリック → http://localhost:5050
+
+どちらも、最新に更新してから、必要な部品がなければ入れて起動する。マイクを使うので、必ず localhost で開くこと。
+
+Mac で初めて使うときは、このリポジトリを Mac に持ってくる(clone)必要がある。
 
 ## 公開のしかた
 

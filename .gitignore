@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.DS_Store
+desktop.ini
+build/
+dist/
+*.spec
+*.zip
+_*.png
+_*.raw

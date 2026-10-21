@@ -12,6 +12,8 @@ import math
 import os
 import sys
 import urllib.request
+from functools import lru_cache
+from urllib.parse import urlencode
 from datetime import datetime, timezone, timedelta
 
 import numpy as np
@@ -44,6 +46,7 @@ JST = timezone(timedelta(hours=9))
 SHEET_WEBHOOK_URL = os.environ.get("SHEET_WEBHOOK_URL", "").strip()
 
 
+@lru_cache(maxsize=32)
 def _font(bold, size):
     name = "NotoSansJP-Bold.otf" if bold else "NotoSansJP-Regular.otf"
     return ImageFont.truetype(os.path.join(FONT_DIR, name), size)
@@ -203,45 +206,53 @@ def _draw_radar(d, scores, cx, cy, R, font):
         d.text((lx - w / 2, ly - 16), label, font=font, fill=(122, 119, 144))
 
 
+@lru_cache(maxsize=1)
+def _profile_photo(size):
+    try:
+        ph = Image.open(os.path.join(BASE_DIR, "profile.jpg")).convert("RGB").resize((size, size))
+        mask = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, size - 1, size - 1], fill=255)
+        return ph, mask
+    except Exception:
+        return None
+
+
 def _render_card(name, total, scores):
-    """1080x1080 の結果画像を作る"""
-    W = H = 1080
-    img = Image.new("RGB", (W, H), (255, 246, 240))
+    """SNSカード用の横長画像(1200x630)を作る"""
+    W, H = 1200, 630
+    # やわらかいグラデーション背景(小さい画像を引き伸ばして高速に)
+    g = Image.new("RGB", (1, 2))
+    g.putpixel((0, 0), (255, 246, 240))
+    g.putpixel((0, 1), (255, 236, 244))
+    img = g.resize((W, H), Image.BILINEAR)
     d = ImageDraw.Draw(img)
 
-    # 背景のやわらかいグラデーション
-    for y in range(H):
-        t = y / H
-        d.line([(0, y), (W, y)],
-               fill=(int(255 - 0 * t), int(246 + 8 * t), int(240 + 5 * t)))
+    LX = 330  # 左側の中心
 
-    def center(text, y, font, fill):
-        d.text(((W - d.textlength(text, font=font)) / 2, y), text, font=font, fill=fill)
+    def center(text, x, y, font, fill):
+        d.text((x - d.textlength(text, font=font) / 2, y), text, font=font, fill=fill)
 
-    # 監修者の写真(丸く切り抜き)
-    try:
-        ph = Image.open(os.path.join(BASE_DIR, "profile.jpg")).convert("RGB").resize((128, 128))
-        mask = Image.new("L", (128, 128), 0)
-        ImageDraw.Draw(mask).ellipse([0, 0, 127, 127], fill=255)
-        img.paste(ph, (W // 2 - 64, 60), mask)
-        d.ellipse([W // 2 - 66, 58, W // 2 + 66, 190], outline=(255, 141, 161), width=5)
-    except Exception:
-        pass
+    ph = _profile_photo(112)
+    if ph:
+        img.paste(ph[0], (LX - 56, 42), ph[1])
+        d.ellipse([LX - 58, 40, LX + 58, 156], outline=(255, 141, 161), width=4)
 
-    center("アナウンサー・音声研究者 かしまだちほ(Ph.D) 監修", 212, _font(False, 23), (58, 56, 70))
-    center("あなたの声診断", 252, _font(True, 58), (255, 126, 149))
+    center("アナウンサー・音声研究者 かしまだちほ(Ph.D) 監修", LX, 172, _font(False, 20), (58, 56, 70))
+    center("あなたの声診断", LX, 204, _font(True, 54), (255, 126, 149))
 
-    y = 332
+    y = 284
     if name:
-        center(f"{name}さんの結果", y, _font(True, 30), (58, 56, 70))
-        y += 44
-    center("総合スコア", y, _font(False, 22), (95, 91, 112))
-    center(str(total), y + 28, _font(True, 110), (59, 191, 159))
-    center("点 / 100点", y + 150, _font(False, 24), (95, 91, 112))
+        center(f"{name}さんの結果", LX, y, _font(True, 28), (58, 56, 70))
+        y += 42
+    center("総合スコア", LX, y, _font(False, 20), (95, 91, 112))
+    center(str(total), LX, y + 18, _font(True, 116), (59, 191, 159))
+    center("点 / 100点", LX, y + 158, _font(False, 22), (95, 91, 112))
 
-    _draw_radar(d, scores, W // 2, 802, 150, _font(False, 23))
+    center("voice-shindan.onrender.com", LX, 584, _font(False, 18), (154, 150, 170))
 
-    center("voice-shindan.onrender.com", 1030, _font(False, 23), (154, 150, 170))
+    # 右側:白いカードの上にレーダーチャート
+    d.rounded_rectangle([650, 36, 1166, 594], radius=30, fill=(255, 255, 255))
+    _draw_radar(d, scores, 908, 322, 150, _font(False, 22))
 
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)
@@ -264,8 +275,11 @@ RESULT_PAGE = """<!DOCTYPE html>
 <meta property="og:title" content="{{ title }}">
 <meta property="og:description" content="音声学の研究ツール Praat があなたの声を6つの観点で分析します。無料・約1分・登録不要。">
 <meta property="og:image" content="{{ img }}">
-<meta property="og:image:width" content="1080">
-<meta property="og:image:height" content="1080">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="あなたの声診断の結果(総合スコアとレーダーチャート)">
+<meta property="og:site_name" content="あなたの声診断">
+<meta property="og:locale" content="ja_JP">
 <meta property="og:url" content="{{ page }}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ title }}">
@@ -294,7 +308,7 @@ RESULT_PAGE = """<!DOCTYPE html>
 def result_page():
     name, total, scores = _parse_result_params(request.args)
     base = request.url_root.rstrip("/")
-    qs = f"n={request.args.get('n','')}&t={total}&a={','.join(map(str, scores))}"
+    qs = urlencode({"n": name, "t": total, "a": ",".join(map(str, scores))})
     title = f"{name}さんの声は {total}点 でした｜あなたの声診断" if name else f"声診断の結果は {total}点 でした｜あなたの声診断"
     return render_template_string(RESULT_PAGE, title=title,
                                   img=f"{base}/ogp.png?{qs}", page=f"{base}/r?{qs}")

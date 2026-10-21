@@ -543,6 +543,7 @@ document.getElementById('analyze').addEventListener('click', ()=>{
   drawRadar(lastAxes);
   showDetail(rec1Data, rec2Data);
   sendLog();
+  SHARE_FILE=null; SHARE_CANVAS=null; prepareShareImage();
   document.getElementById('results').style.display="block";
   document.getElementById('results').scrollIntoView({behavior:'smooth'});
 });
@@ -715,8 +716,37 @@ function shareText(){
          `#あなたの声診断 #ボイトレ #声診断`;
 }
 
-function loadImg(src){
-  return new Promise(res=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src; });
+function loadImg(src, ms=3000){
+  return new Promise(res=>{
+    const im=new Image(); let done=false;
+    const fin=v=>{ if(!done){ done=true; res(v); } };
+    im.onload=()=>fin(im); im.onerror=()=>fin(null);
+    setTimeout(()=>fin(null), ms);   // 遅いときは写真なしで進める
+    im.src=src;
+  });
+}
+// 写真は先に読み込んでおく(シェア時に待たせないため)
+const PHOTO_READY = loadImg('profile.jpg', 8000);
+
+// スマホかどうか(PCでは共有メニューを使わず「保存＋コピー」にする)
+const IS_MOBILE = (navigator.userAgentData && navigator.userAgentData.mobile) ||
+  /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+  (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+
+// シェア用画像を前もって作っておく(押した瞬間に共有メニューを開くため)
+let SHARE_FILE=null, SHARE_CANVAS=null;
+async function prepareShareImage(){
+  try{
+    SHARE_CANVAS = await buildShareCanvas();
+    const blob = await canvasToBlob(SHARE_CANVAS);
+    SHARE_FILE = new File([blob],"voice-result.png",{type:"image/png"});
+  }catch(e){ SHARE_FILE=null; }
+}
+
+// クリップボードへのコピー(固まらないよう上限つき)
+function copyText(text){
+  const tryCopy = navigator.clipboard ? navigator.clipboard.writeText(text).then(()=>true) : Promise.reject();
+  return Promise.race([tryCopy, new Promise(r=>setTimeout(()=>r(false),1500))]).catch(()=>false);
 }
 
 async function buildShareCanvas(){
@@ -728,7 +758,7 @@ async function buildShareCanvas(){
   ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
   ctx.textAlign="center"; ctx.textBaseline="alphabetic";
 
-  const photo=await loadImg('profile.jpg');
+  const photo=await PHOTO_READY;
   if(photo){
     ctx.save();
     ctx.beginPath(); ctx.arc(W/2,128,64,0,7); ctx.closePath(); ctx.clip();
@@ -791,25 +821,35 @@ document.getElementById('shareLINE').addEventListener('click', ()=>{
 });
 document.getElementById('shareIG').addEventListener('click', async ()=>{
   if(needResult()) return;
-  const cv=await buildShareCanvas();
-  // スマホ:共有メニューからInstagramを選べる
-  try{
-    const blob=await canvasToBlob(cv);
-    const file=new File([blob],"voice-result.png",{type:"image/png"});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], text:shareText()});
+
+  // スマホ:共有メニューから Instagram を選んでもらう
+  if(IS_MOBILE && SHARE_FILE && navigator.canShare && navigator.canShare({files:[SHARE_FILE]})){
+    try{
+      await navigator.share({files:[SHARE_FILE], text:shareText()});
       return;
+    }catch(e){
+      if(e && e.name==="AbortError") return;   // 自分で閉じた場合
+      // それ以外の失敗は、下の「保存＋コピー」に進む
     }
-  }catch(e){ if(e && e.name==="AbortError") return; }
-  // PCなど:画像を保存して投稿文をコピー
+  }
+
+  // PC(またはスマホで共有できなかったとき):投稿文コピー → 画像保存 → 案内
+  const copied = await copyText(shareText());   // クリック直後にコピー
+  const cv = SHARE_CANVAS || await buildShareCanvas();
   downloadCanvas(cv);
-  try{ await navigator.clipboard.writeText(shareText()); }catch(e){}
-  alert("結果画像を保存し、投稿文をコピーしました。\n\nInstagramを開いて、保存した画像を投稿してください。\n(Instagramは他のSNSと違い、外部から直接投稿できない仕組みのためです)");
+  alert(
+    (copied ? "結果画像を保存し、投稿文をコピーしました。" : "結果画像を保存しました。(投稿文のコピーはできませんでした)") +
+    "\n\n" +
+    "Instagramを開いて、保存した画像を投稿してください。" +
+    (copied ? "投稿文は貼り付け(Ctrl+V)で入力できます。" : "") +
+    "\n\n" +
+    "※ Instagramは他のSNSと違い、外部から直接投稿できない仕組みのため、この方法になります。"
+  );
 });
 
 document.getElementById('saveImg').addEventListener('click', async ()=>{
   if(needResult()) return;
-  downloadCanvas(await buildShareCanvas());
+  downloadCanvas(SHARE_CANVAS || await buildShareCanvas());
 });
 
 document.getElementById('cta').addEventListener('click', ()=>{
